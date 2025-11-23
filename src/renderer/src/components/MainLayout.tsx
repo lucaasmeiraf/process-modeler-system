@@ -95,17 +95,6 @@ export default function MainLayout(): React.ReactElement {
               <LayoutDashboard size={20} className="group-hover:scale-110 transition-transform duration-300" />
               <span className="font-medium">Dashboard</span>
             </Link>
-
-            <Link
-              to="/settings"
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group ${location.pathname === '/settings'
-                ? 'bg-gradient-to-r from-cyan-500/20 to-blue-600/20 text-cyan-400 border border-cyan-500/30 shadow-lg shadow-cyan-900/20'
-                : 'text-dark-300 hover:bg-white/5 hover:text-white'
-                }`}
-            >
-              <Settings size={20} className="group-hover:rotate-90 transition-transform duration-500" />
-              <span className="font-medium">Configurações</span>
-            </Link>
           </nav>
 
           {/* Footer Actions */}

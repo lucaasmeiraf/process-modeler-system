@@ -32,7 +32,7 @@ function createWindow(): void {
               "style-src 'self' 'unsafe-inline' http://localhost:*; " +
               "img-src 'self' data: https: http://localhost:*; " +
               "font-src 'self' data: http://localhost:*; " +
-              "connect-src 'self' https://*.supabase.co wss://*.supabase.co http://localhost:* ws://localhost:*; " +
+              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.openai.com https://api.anthropic.com http://localhost:* ws://localhost:*; " +
               "worker-src 'self' blob:;"
           ]
         }

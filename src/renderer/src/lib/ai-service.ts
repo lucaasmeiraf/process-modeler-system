@@ -19,8 +19,28 @@ export interface AIConfig {
 /**
  * Gera o System Prompt completo a partir da Base de Conhecimento
  */
-export function generateSystemPrompt(board: Board): string {
+export function generateSystemPrompt(board: Board, currentProcess?: any): string {
   const parts: string[] = []
+
+  // Instruções do Assistente Consultivo
+  parts.push('Você é um assistente especializado em processos de negócio e BPMN 2.0.\n')
+  parts.push('Seu objetivo é ajudar o usuário a:\n')
+  parts.push('- Entender e analisar processos existentes\n')
+  parts.push('- Sugerir melhorias baseadas em boas práticas de BPMN\n')
+  parts.push('- Esclarecer dúvidas sobre terminologia, legislação e sistemas\n')
+  parts.push('- Orientar sobre padrões e conformidade\n')
+  parts.push('\nIMPORTANTE: Você NÃO deve gerar código BPMN XML. Apenas forneça orientações e sugestões.\n')
+  parts.push('\n---\n\n')
+
+  // Contexto do Processo Atual (se houver)
+  if (currentProcess) {
+    parts.push('## PROCESSO ATUAL EM ANÁLISE\n\n')
+    parts.push(`**Título**: ${currentProcess.title}\n`)
+    if (currentProcess.description) {
+      parts.push(`**Descrição**: ${currentProcess.description}\n`)
+    }
+    parts.push('\n')
+  }
 
   // 1. System Prompt customizado (se configurado)
   if (board.ai_config?.system_prompt) {
@@ -189,10 +209,11 @@ export async function sendMessage(
   userMessage: string,
   board: Board,
   config: AIConfig,
-  conversationHistory: AIMessage[] = []
+  conversationHistory: AIMessage[] = [],
+  currentProcess?: any
 ): Promise<string> {
-  // 1. Gerar system prompt com a Base de Conhecimento
-  const systemPrompt = generateSystemPrompt(board)
+  // 1. Gerar system prompt com a Base de Conhecimento e processo atual
+  const systemPrompt = generateSystemPrompt(board, currentProcess)
 
   // 2. Montar mensagens
   const messages: AIMessage[] = [

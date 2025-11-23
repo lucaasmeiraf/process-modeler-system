@@ -33,7 +33,8 @@ import {
   History,
   BarChart2,
   PieChart,
-  BookOpen
+  BookOpen,
+  Upload
 } from 'lucide-react'
 import BpmnModeler from 'bpmn-js/lib/Modeler'
 import { downloadXML, downloadSVG, generatePDF } from '../lib/export-service'
@@ -163,7 +164,11 @@ export default function ProcessesPage() {
     setXml(process.bpmn_xml || undefined)
     setSelectedElement(null)
     setChatMessages([
-      { role: 'assistant', content: 'Olá! Como posso te ajudar?' }
+      {
+        role: 'assistant',
+        content:
+          'Olá! Sou seu assistente especializado em processos de negócio e BPMN. Posso ajudá-lo a entender processos, sugerir melhorias e esclarecer dúvidas sobre terminologia, legislação e sistemas. Como posso ajudar?'
+      }
     ])
   }
 
@@ -283,6 +288,59 @@ export default function ProcessesPage() {
     })
   }
 
+  const handleImportBPMN = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    try {
+      const xmlText = await file.text()
+
+      // Validar se é XML válido
+      const parser = new DOMParser()
+      const xmlDoc = parser.parseFromString(xmlText, 'text/xml')
+
+      if (xmlDoc.getElementsByTagName('parsererror').length > 0) {
+        throw new Error('Arquivo XML inválido')
+      }
+
+      // Validar se é BPMN 2.0
+      if (!xmlText.includes('bpmn') && !xmlText.includes('definitions')) {
+        throw new Error('Arquivo não é BPMN válido')
+      }
+
+      // Carregar no diagrama
+      setXml(xmlText)
+
+      // Salvar no banco se houver processo selecionado
+      if (selectedProcess) {
+        const { error } = await supabase
+          .from('processes')
+          .update({
+            bpmn_xml: xmlText,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', selectedProcess.id)
+
+        if (error) throw error
+
+        setProcesses(
+          processes.map((p) => (p.id === selectedProcess.id ? { ...p, bpmn_xml: xmlText } : p))
+        )
+
+        toast.success('BPMN importado e salvo com sucesso!')
+      } else {
+        toast.success('BPMN importado com sucesso!')
+      }
+
+      // Limpar o input para permitir reimportação do mesmo arquivo
+      e.target.value = ''
+    } catch (error: any) {
+      console.error('Import error:', error)
+      toast.error(`Erro ao importar: ${error.message}`)
+      e.target.value = ''
+    }
+  }
+
   const handleSendMessage = async () => {
     if ((!inputMessage.trim() && !attachedAudio) || !import.meta.env.VITE_OPENAI_API_KEY) return
 
@@ -327,39 +385,49 @@ export default function ProcessesPage() {
       setAttachedImage(null)
       setAttachedAudio(null)
 
-      // Generate BPMN using the direct AI service
+      // AI Consultive Assistant Configuration
       const aiConfig: AIConfig = {
+        provider: 'openai',
         apiKey: import.meta.env.VITE_OPENAI_API_KEY || '',
-        model: 'gpt-4o', // Or another suitable model
+        model: 'gpt-4o',
+        temperature: 0.7
       }
 
-      const aiMessages: AIMessage[] = chatMessages.map(msg => ({
-        role: msg.role,
-        content: typeof msg.content === 'string' ? msg.content : msg.content.map(part => {
-          if (part.type === 'text') return { type: 'text', text: part.text }
-          if (part.type === 'image_url') return { type: 'image_url', image_url: { url: part.image_url.url } }
-          return { type: 'text', text: '' } // Fallback
-        })
-      })).concat([userMsg as AIMessage]); // Add the current user message
+      // Prepare conversation history (exclude the current user message)
+      const conversationHistory: AIMessage[] = chatMessages
+        .filter((msg) => typeof msg.content === 'string')
+        .map((msg) => ({
+          role: msg.role as 'system' | 'user' | 'assistant',
+          content: msg.content as string
+        }))
 
-      const bpmnXml = await sendAIMessage(aiMessages, aiConfig, board || undefined)
+      // Get the user message text
+      const userMessageText =
+        typeof messageContent === 'string'
+          ? messageContent
+          : messageContent.find((part: any) => part.type === 'text')?.text || ''
 
-      setXml(bpmnXml)
+      // Call AI service with board context and current process
+      if (!board) {
+        throw new Error('Quadro não encontrado')
+      }
+
+      const aiResponse = await sendAIMessage(
+        userMessageText,
+        board,
+        aiConfig,
+        conversationHistory,
+        selectedProcess || undefined
+      )
+
+      // Add AI response to chat (consultive response, not BPMN)
       setChatMessages((prev) => [
         ...prev,
         {
           role: 'assistant',
-          content: 'I have generated the BPMN diagram based on your description.'
+          content: aiResponse
         }
       ])
-
-      // Auto-save generated XML
-      if (selectedProcess) {
-        await supabase
-          .from('processes')
-          .update({ bpmn_xml: bpmnXml, updated_at: new Date().toISOString() })
-          .eq('id', selectedProcess.id)
-      }
     } catch (error: any) {
       console.error('Generation error:', error)
       setChatMessages((prev) => [
@@ -538,47 +606,50 @@ export default function ProcessesPage() {
             boardName={board.name}
           />
         )}
+        ```
       </>
     )
   }
 
   return (
-    <div className="flex h-full text-white">
-      {/* Left Column: Process Details + Chat (25%) */}
-      <div className="w-[25%] min-w-[320px] border-r border-white/5 bg-white/5 backdrop-blur-xl flex flex-col">
+    <div className="flex h-full text-white relative">
+      {/* Left Column: Process Details + Chat - Responsive */}
+      <div className={`
+        w-full md:w-[25%] md:min-w-[320px] 
+        border-r border-white/5 
+        bg-dark-950 md:bg-white/5 md:backdrop-blur-xl 
+        flex flex-col
+        ${selectedProcess ? 'block' : 'hidden md:block'}
+      `}>
         <div className="p-5 border-b border-white/5 flex flex-col gap-4">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setSelectedProcess(null)}
-              className="p-2 bg-white/5 hover:bg-white/10 rounded-full transition-colors border border-white/10"
-              title="Back to processes"
+              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+              title="Voltar"
             >
               <ArrowLeft size={20} />
             </button>
-            <div>
-              <p className="text-[10px] uppercase tracking-[0.4em] text-cyan-300/70">Processo</p>
-              <h2 className="font-semibold truncate text-lg">{selectedProcess.title}</h2>
-            </div>
+            <h2 className="text-lg font-semibold text-white truncate flex-1">
+              {selectedProcess?.title || 'Processo'}
+            </h2>
           </div>
 
-          <form onSubmit={handleProcessDetailsSubmit} className="space-y-4">
+          <form onSubmit={handleProcessDetailsSubmit} className="space-y-3">
             <div>
-              <label className="block text-xs uppercase tracking-[0.3em] text-dark-300 mb-2">
-                Título do processo
+              <label className="text-xs font-medium text-dark-200 mb-1 block">
+                Título do Processo
               </label>
               <input
                 type="text"
                 value={processTitleInput}
                 onChange={(e) => setProcessTitleInput(e.target.value)}
                 className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-400/60 transition"
-                required
-                placeholder="Nome visível do processo"
+                placeholder="Ex: Aprovação de Férias"
               />
             </div>
             <div>
-              <label className="block text-xs uppercase tracking-[0.3em] text-dark-300 mb-2">
-                Descrição
-              </label>
+              <label className="text-xs font-medium text-dark-200 mb-1 block">Descrição</label>
               <textarea
                 value={processDescriptionInput}
                 onChange={(e) => setProcessDescriptionInput(e.target.value)}
@@ -599,8 +670,9 @@ export default function ProcessesPage() {
           </form>
         </div>
 
-        <div className="flex-1 flex flex-col">
-          <div className="flex-1 p-5 overflow-y-auto space-y-4">
+        {/* Chat Container with proper scroll */}
+        <div className="flex-1 flex flex-col min-h-0">
+          <div className="flex-1 p-5 overflow-y-auto space-y-4 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
             {chatMessages.map((msg, idx) => (
               <div
                 key={idx}
@@ -738,9 +810,34 @@ export default function ProcessesPage() {
         </div>
       </div>
 
-      {/* Center Column: BPMN Modeler (50%) */}
-      <div className="w-[50%] bg-white relative flex flex-col">
-        <div className="absolute top-4 right-4 z-10 flex gap-2">
+      {/* Center Column: BPMN Modeler - Responsive */}
+      <div className={`
+        w-full md:w-[50%] 
+        bg-white 
+        relative flex flex-col
+        ${selectedProcess ? 'hidden md:flex' : 'flex'}
+      `}>
+        <div className="absolute top-4 right-4 z-10 flex gap-2 flex-wrap">
+          {/* Hidden file input for BPMN import */}
+          <input
+            type="file"
+            accept=".bpmn,.xml"
+            onChange={handleImportBPMN}
+            style={{ display: 'none' }}
+            id="bpmn-import-input"
+          />
+
+          {/* Import BPMN Button */}
+          <button
+            onClick={() => document.getElementById('bpmn-import-input')?.click()}
+            className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg shadow-lg hover:bg-purple-700 transition-colors border border-purple-500"
+            title="Importar arquivo BPMN 2.0"
+          >
+            <Upload size={16} />
+            <span className="hidden sm:inline">Importar BPMN</span>
+          </button>
+
+          {/* Analytics Button */}
           <div className="relative">
             <button
               onClick={() => setShowAnalytics(true)}
