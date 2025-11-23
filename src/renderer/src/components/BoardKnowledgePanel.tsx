@@ -576,10 +576,22 @@ export default function BoardKnowledgePanel({
                                                 onChange={(e) => setAiConfig({ ...aiConfig, model: e.target.value })}
                                                 className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:border-cyan-500/50 focus:outline-none"
                                             >
-                                                <option value="gpt-4">GPT-4 (Recomendado)</option>
-                                                <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
-                                                <option value="claude-3-opus">Claude 3 Opus</option>
-                                                <option value="claude-3-sonnet">Claude 3 Sonnet</option>
+                                                <optgroup label="OpenAI">
+                                                    <option value="gpt-4o">GPT-4o (Mais Recente)</option>
+                                                    <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                                                    <option value="gpt-4">GPT-4 (Recomendado)</option>
+                                                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo (Rápido)</option>
+                                                </optgroup>
+                                                <optgroup label="Anthropic Claude">
+                                                    <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet (Mais Recente)</option>
+                                                    <option value="claude-3-opus-20240229">Claude 3 Opus (Mais Capaz)</option>
+                                                    <option value="claude-3-sonnet-20240229">Claude 3 Sonnet (Balanceado)</option>
+                                                    <option value="claude-3-haiku-20240307">Claude 3 Haiku (Rápido)</option>
+                                                </optgroup>
+                                                <optgroup label="Google">
+                                                    <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                                                    <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                                                </optgroup>
                                             </select>
                                         </div>
                                         <div>

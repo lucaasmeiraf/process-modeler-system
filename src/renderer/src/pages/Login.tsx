@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { Loader2, AlertCircle } from 'lucide-react'
+import { toast } from 'sonner'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -19,6 +20,7 @@ export default function Login() {
     try {
       const { error } = await signIn(email, password)
       if (error) throw error
+      toast.success('Login realizado com sucesso!')
       navigate('/')
     } catch (error: any) {
       console.error('Login error:', error)

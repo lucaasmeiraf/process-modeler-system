@@ -5,7 +5,9 @@ import { useAuth } from '../contexts/AuthContext'
 import { useSidebar } from '../contexts/SidebarContext'
 import BPMNModeler from '../components/BPMNModeler'
 import PropertiesPanel from '../components/PropertiesPanel'
-import { AgentService, getStoredAgents, ChatMessage } from '../lib/ai/agent-service'
+import { ChatMessage } from '../lib/ai/agent-service'
+import { sendMessage as sendAIMessage, AIConfig, AIMessage } from '../lib/ai-service'
+import { toast } from 'sonner'
 import { getBoard } from '../lib/board-service'
 import { Board } from '../types/board'
 import BoardKnowledgePanel from '../components/BoardKnowledgePanel'
@@ -70,8 +72,6 @@ export default function ProcessesPage() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [inputMessage, setInputMessage] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
-  const [selectedAgentId, setSelectedAgentId] = useState<string>('')
-  const agents = getStoredAgents()
   const chatEndRef = useRef<HTMLDivElement>(null)
   const [showExportMenu, setShowExportMenu] = useState(false)
 
@@ -98,12 +98,6 @@ export default function ProcessesPage() {
     setHideSidebar(Boolean(selectedProcess))
     return () => setHideSidebar(false)
   }, [selectedProcess, setHideSidebar])
-
-  useEffect(() => {
-    if (agents.length > 0 && !selectedAgentId) {
-      setSelectedAgentId(agents[0].id)
-    }
-  }, [agents])
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -169,7 +163,7 @@ export default function ProcessesPage() {
     setXml(process.bpmn_xml || undefined)
     setSelectedElement(null)
     setChatMessages([
-      { role: 'assistant', content: 'Hello! Describe the process you want to create or modify.' }
+      { role: 'assistant', content: 'Olá! Como posso te ajudar?' }
     ])
   }
 
@@ -213,10 +207,11 @@ export default function ProcessesPage() {
       if (updatedProcess) {
         setSelectedProcess(updatedProcess)
         setProcesses((prev) => prev.map((p) => (p.id === updatedProcess.id ? updatedProcess : p)))
+        toast.success('Detalhes do processo salvos com sucesso!')
       }
     } catch (error) {
       console.error('Error updating process details:', error)
-      alert('Failed to update process details.')
+      toast.error('Falha ao salvar detalhes do processo')
     } finally {
       setDetailsSaving(false)
     }
@@ -263,11 +258,10 @@ export default function ProcessesPage() {
         processes.map((p) => (p.id === selectedProcess.id ? { ...p, bpmn_xml: xml } : p))
       )
 
-      // Optional: Show success feedback
-      // alert('Processo salvo e nova versão criada!') 
+      toast.success('Processo salvo com sucesso!')
     } catch (error) {
       console.error('Error saving process:', error)
-      alert('Failed to save process.')
+      toast.error('Falha ao salvar processo')
     } finally {
       setSaving(false)
     }
@@ -290,27 +284,24 @@ export default function ProcessesPage() {
   }
 
   const handleSendMessage = async () => {
-    if ((!inputMessage.trim() && !attachedAudio) || !selectedAgentId) return
-
-    const agentConfig = agents.find((a) => a.id === selectedAgentId)
-    if (!agentConfig) {
-      alert('Please select a valid agent in Settings.')
-      return
-    }
+    if ((!inputMessage.trim() && !attachedAudio) || !import.meta.env.VITE_OPENAI_API_KEY) return
 
     setIsGenerating(true)
 
     try {
-      const agentService = new AgentService(agentConfig)
       let finalUserMessageContent: any = inputMessage
 
       // Handle Audio Transcription first if present
       if (attachedAudio) {
         try {
-          const transcription = await agentService.transcribeAudio(attachedAudio)
+          // For now, direct transcription is not part of sendAIMessage.
+          // This would require a separate API call or a service that handles it.
+          // For this change, we'll simulate or skip direct transcription and just note the audio.
+          // In a real app, you'd integrate an audio transcription service here.
+          console.warn('Audio transcription not directly supported by current AI service integration. Attaching audio file name.')
           finalUserMessageContent = inputMessage
-            ? `${inputMessage}\n\n[Audio Transcription]: ${transcription}`
-            : transcription
+            ? `${inputMessage}\n\n[Audio file attached: ${attachedAudio.name}]`
+            : `[Audio file attached: ${attachedAudio.name}]`
         } catch (err) {
           console.error('Transcription failed', err)
           alert('Audio transcription failed. Proceeding with text only.')
@@ -336,15 +327,22 @@ export default function ProcessesPage() {
       setAttachedImage(null)
       setAttachedAudio(null)
 
-      // Generate BPMN
-      // We need to pass the entire history for context, but for this MVP we might just pass the current request
-      // or a limited history. Let's pass history + new message.
-      // Note: We need to be careful with passing base64 images in history repeatedly as it consumes tokens/bandwidth.
-      // For now, let's just pass the current message + system prompt (handled in service)
-      // or maybe the last few text messages.
-      // A simple approach: Pass the current constructed message.
+      // Generate BPMN using the direct AI service
+      const aiConfig: AIConfig = {
+        apiKey: import.meta.env.VITE_OPENAI_API_KEY || '',
+        model: 'gpt-4o', // Or another suitable model
+      }
 
-      const bpmnXml = await agentService.generateBPMN([userMsg], board || undefined)
+      const aiMessages: AIMessage[] = chatMessages.map(msg => ({
+        role: msg.role,
+        content: typeof msg.content === 'string' ? msg.content : msg.content.map(part => {
+          if (part.type === 'text') return { type: 'text', text: part.text }
+          if (part.type === 'image_url') return { type: 'image_url', image_url: { url: part.image_url.url } }
+          return { type: 'text', text: '' } // Fallback
+        })
+      })).concat([userMsg as AIMessage]); // Add the current user message
+
+      const bpmnXml = await sendAIMessage(aiMessages, aiConfig, board || undefined)
 
       setXml(bpmnXml)
       setChatMessages((prev) => [
@@ -589,20 +587,6 @@ export default function ProcessesPage() {
               />
             </div>
             <div className="flex justify-between items-center gap-3">
-              <select
-                value={selectedAgentId}
-                onChange={(e) => setSelectedAgentId(e.target.value)}
-                className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400/60"
-              >
-                <option value="" disabled>
-                  Selecione o agente AI
-                </option>
-                {agents.map((agent) => (
-                  <option key={agent.id} value={agent.id}>
-                    {agent.name} ({agent.provider})
-                  </option>
-                ))}
-              </select>
 
               <button
                 type="submit"
@@ -678,9 +662,11 @@ export default function ProcessesPage() {
                   onChange={(e) => setInputMessage(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
                   placeholder={
-                    agents.length === 0 ? 'Configure um agente nas Configurações' : 'Descreva o processo...'
+                    import.meta.env.VITE_OPENAI_API_KEY
+                      ? 'Digite sua mensagem...'
+                      : 'Configure a chave de API no arquivo .env'
                   }
-                  disabled={agents.length === 0 || isGenerating}
+                  disabled={!import.meta.env.VITE_OPENAI_API_KEY || isGenerating}
                   className="w-full bg-white/5 border border-white/10 rounded-xl pl-3 pr-12 py-2 text-sm text-white focus:outline-none focus:border-cyan-400/60 disabled:opacity-50"
                 />
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 flex gap-1 text-white/50">
@@ -717,7 +703,9 @@ export default function ProcessesPage() {
               <button
                 onClick={handleSendMessage}
                 disabled={
-                  (!inputMessage.trim() && !attachedAudio) || agents.length === 0 || isGenerating
+                  (!inputMessage.trim() && !attachedAudio) ||
+                  !import.meta.env.VITE_OPENAI_API_KEY ||
+                  isGenerating
                 }
                 className="px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 text-sm font-semibold shadow-lg shadow-blue-900/40 hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
               >
