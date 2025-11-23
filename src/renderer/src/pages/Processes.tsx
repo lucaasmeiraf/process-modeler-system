@@ -8,6 +8,15 @@ import PropertiesPanel from '../components/PropertiesPanel'
 import { ChatMessage } from '../lib/ai/agent-service'
 import { sendMessage as sendAIMessage, AIConfig, AIMessage } from '../lib/ai-service'
 import { toast } from 'sonner'
+import { ChatThread } from '../types/chat'
+import {
+  createThread,
+  listUserThreads,
+  sendMessageToThread,
+  getThreadMessages,
+  updateThreadTimestamp,
+  deleteThread
+} from '../lib/thread-service'
 import { getBoard } from '../lib/board-service'
 import { Board } from '../types/board'
 import BoardKnowledgePanel from '../components/BoardKnowledgePanel'
@@ -34,7 +43,9 @@ import {
   BarChart2,
   PieChart,
   BookOpen,
-  Upload
+  Upload,
+  MessageSquarePlus,
+  Trash2
 } from 'lucide-react'
 import BpmnModeler from 'bpmn-js/lib/Modeler'
 import { downloadXML, downloadSVG, generatePDF } from '../lib/export-service'
@@ -75,6 +86,12 @@ export default function ProcessesPage() {
   const [isGenerating, setIsGenerating] = useState(false)
   const chatEndRef = useRef<HTMLDivElement>(null)
   const [showExportMenu, setShowExportMenu] = useState(false)
+
+  // Thread state
+  const [threads, setThreads] = useState<ChatThread[]>([])
+  const [currentThread, setCurrentThread] = useState<ChatThread | null>(null)
+  const [showThreadSelector, setShowThreadSelector] = useState(false)
+  const [loadingThreads, setLoadingThreads] = useState(false)
 
   // Multimodal state
   const [attachedImage, setAttachedImage] = useState<File | null>(null)
@@ -912,9 +929,9 @@ export default function ProcessesPage() {
         </div>
       </div>
 
-      {/* Right Column: Activity Details (25%) */}
-      <div className="w-[25%] min-w-[320px] border-l border-white/5 bg-white/5 backdrop-blur-xl flex flex-col">
-        <PropertiesPanel modeler={modeler} element={selectedElement} />
+      {/* Right Column: Activity Details - Hidden on Mobile */}
+      <div className="hidden lg:block w-[25%] min-w-[280px] border-l border-white/5 bg-white/5 backdrop-blur-xl p-5 overflow-y-auto">
+        {selectedElement ? <PropertiesPanel modeler={modeler} element={selectedElement} /> : null}
       </div>
       {renderCreateModal}
       {board && (
