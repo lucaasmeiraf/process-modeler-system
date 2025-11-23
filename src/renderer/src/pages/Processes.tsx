@@ -235,6 +235,7 @@ export default function ProcessesPage() {
 
     try {
       const { xml } = await modeler.saveXML({ format: true })
+      const { svg } = await modeler.saveSVG()
 
       if (!xml) return
 
@@ -243,7 +244,8 @@ export default function ProcessesPage() {
         selectedProcess.id,
         xml,
         'Salvo manualmente', // Default comment since prompt is tricky in Electron
-        user.id
+        user.id,
+        svg
       )
 
       // Also update the main process record (current draft)
@@ -854,7 +856,7 @@ export default function ProcessesPage() {
 
       {compareVersion && (
         <ProcessDiffViewer
-          currentXml={xml}
+          currentXml={xml || ''}
           compareVersion={compareVersion}
           onClose={() => setCompareVersion(null)}
         />
@@ -864,8 +866,7 @@ export default function ProcessesPage() {
         <ProcessAnalytics
           isOpen={showAnalytics}
           onClose={() => setShowAnalytics(false)}
-          xml={xml}
-          processTitle={selectedProcess.title}
+          process={selectedProcess ? { ...selectedProcess, bpmn_xml: xml || selectedProcess.bpmn_xml } : null}
         />
       )}
 

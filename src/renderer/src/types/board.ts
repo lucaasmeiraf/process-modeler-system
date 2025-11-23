@@ -42,6 +42,11 @@ export interface BoardKnowledgeBase {
   legislation?: LegislationItem[]
   org_structure?: OrgItem[]
   documents?: BoardDocument[]
+  ai_config?: {
+    system_prompt?: string
+    model?: string
+    temperature?: number
+  }
 }
 
 export interface Board extends BoardKnowledgeBase {

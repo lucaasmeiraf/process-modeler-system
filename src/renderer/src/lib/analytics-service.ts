@@ -98,3 +98,16 @@ export const getBoardAnalytics = (processes: Process[]) => {
     totalDuration
   }
 }
+
+export const getRecentActivity = (processes: Process[], limit = 5) => {
+  return processes
+    .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+    .slice(0, limit)
+}
+
+export const getStaleProcesses = (processes: Process[], daysThreshold = 30) => {
+  const thresholdDate = new Date()
+  thresholdDate.setDate(thresholdDate.getDate() - daysThreshold)
+
+  return processes.filter(p => new Date(p.updated_at) < thresholdDate && p.status !== 'published')
+}

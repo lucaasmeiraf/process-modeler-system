@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react'
 import { Board, GlossaryTerm, SystemItem, LegislationItem, OrgItem, BoardDocument } from '../types/board'
 import { updateBoardKnowledgeBase } from '../lib/board-service'
 import { supabase } from '../lib/supabase'
-import { X, Save, Plus, Trash2, Book, Database, Scale, Users, FileText, Loader2, Upload, Download, File } from 'lucide-react'
+import { X, Save, Plus, Trash2, Book, Database, Scale, Users, FileText, Loader2, Upload, Download, File, Bot, Eye } from 'lucide-react'
 import { v4 as uuidv4 } from 'uuid'
+import MDEditor from '@uiw/react-md-editor'
 
-type Tab = 'context' | 'glossary' | 'systems' | 'legislation' | 'org' | 'documents'
+type Tab = 'context' | 'glossary' | 'systems' | 'legislation' | 'org' | 'documents' | 'ai_config'
 
 interface BoardKnowledgePanelProps {
     board: Board
@@ -30,7 +31,13 @@ export default function BoardKnowledgePanel({
     const [legislation, setLegislation] = useState<LegislationItem[]>(board.legislation || [])
     const [orgStructure, setOrgStructure] = useState<OrgItem[]>(board.org_structure || [])
     const [documents, setDocuments] = useState<BoardDocument[]>(board.documents || [])
+    const [aiConfig, setAiConfig] = useState(board.ai_config || {
+        system_prompt: '',
+        model: 'gpt-4',
+        temperature: 0.7
+    })
     const [uploading, setUploading] = useState(false)
+    const [previewDoc, setPreviewDoc] = useState<BoardDocument | null>(null)
 
     useEffect(() => {
         if (isOpen) {
@@ -40,6 +47,11 @@ export default function BoardKnowledgePanel({
             setLegislation(board.legislation || [])
             setOrgStructure(board.org_structure || [])
             setDocuments(board.documents || [])
+            setAiConfig(board.ai_config || {
+                system_prompt: '',
+                model: 'gpt-4',
+                temperature: 0.7
+            })
         }
     }, [isOpen, board])
 
@@ -108,7 +120,8 @@ export default function BoardKnowledgePanel({
                 integrated_systems: systems,
                 legislation,
                 org_structure: orgStructure,
-                documents
+                documents,
+                ai_config: aiConfig
             })
             if (updated) {
                 onUpdate(updated)
@@ -125,7 +138,7 @@ export default function BoardKnowledgePanel({
 
     return (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-[#0b101b] w-full max-w-5xl h-[85vh] rounded-2xl border border-white/10 shadow-2xl flex flex-col overflow-hidden">
+            <div className="bg-[#0b101b] w-full max-w-6xl h-[90vh] rounded-2xl border border-white/10 shadow-2xl flex flex-col overflow-hidden">
                 {/* Header */}
                 <div className="p-6 border-b border-white/10 flex justify-between items-center bg-[#070b13]">
                     <div>
@@ -144,7 +157,7 @@ export default function BoardKnowledgePanel({
 
                 <div className="flex flex-1 overflow-hidden">
                     {/* Sidebar Tabs */}
-                    <div className="w-64 bg-[#05080f] border-r border-white/5 p-4 space-y-2">
+                    <div className="w-64 bg-[#05080f] border-r border-white/5 p-4 space-y-2 overflow-y-auto">
                         <TabButton
                             active={activeTab === 'context'}
                             onClick={() => setActiveTab('context')}
@@ -181,19 +194,28 @@ export default function BoardKnowledgePanel({
                             icon={<File size={18} />}
                             label="Documentos"
                         />
+                        <div className="h-px bg-white/10 my-2" />
+                        <TabButton
+                            active={activeTab === 'ai_config'}
+                            onClick={() => setActiveTab('ai_config')}
+                            icon={<Bot size={18} />}
+                            label="Configuração IA"
+                        />
                     </div>
 
                     {/* Content Area */}
                     <div className="flex-1 overflow-y-auto p-8 bg-[#0b101b]">
                         {activeTab === 'context' && (
-                            <div className="space-y-4">
-                                <h3 className="text-lg font-semibold text-white mb-4">Contexto do Setor (Markdown)</h3>
-                                <textarea
-                                    value={context}
-                                    onChange={(e) => setContext(e.target.value)}
-                                    className="w-full h-[500px] bg-white/5 border border-white/10 rounded-xl p-4 text-white font-mono text-sm focus:outline-none focus:border-cyan-500/50 resize-none"
-                                    placeholder="# Visão Geral do Setor..."
-                                />
+                            <div className="space-y-4 h-full flex flex-col">
+                                <h3 className="text-lg font-semibold text-white mb-2">Contexto do Setor (Rich Text)</h3>
+                                <div className="flex-1 min-h-[500px]" data-color-mode="dark">
+                                    <MDEditor
+                                        value={context}
+                                        onChange={(val) => setContext(val || '')}
+                                        height="100%"
+                                        className="bg-dark-900"
+                                    />
+                                </div>
                             </div>
                         )}
 
@@ -464,7 +486,7 @@ export default function BoardKnowledgePanel({
                                                     type="file"
                                                     onChange={handleFileUpload}
                                                     className="hidden"
-                                                    accept=".pdf,.doc,.docx,.xls,.xlsx,.txt"
+                                                    accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.jpg,.png"
                                                     disabled={uploading}
                                                 />
                                             </>
@@ -486,12 +508,19 @@ export default function BoardKnowledgePanel({
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-2">
+                                                <button
+                                                    onClick={() => setPreviewDoc(doc)}
+                                                    className="p-2 hover:bg-white/10 rounded-lg text-cyan-400 hover:text-cyan-300 transition"
+                                                    title="Visualizar"
+                                                >
+                                                    <Eye size={18} />
+                                                </button>
                                                 <a
                                                     href={doc.url}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
                                                     className="p-2 hover:bg-white/10 rounded-lg text-cyan-400 hover:text-cyan-300 transition"
-                                                    title="Visualizar"
+                                                    title="Baixar"
                                                 >
                                                     <Download size={18} />
                                                 </a>
@@ -515,6 +544,60 @@ export default function BoardKnowledgePanel({
                                 </div>
                             </div>
                         )}
+
+                        {activeTab === 'ai_config' && (
+                            <div className="space-y-6">
+                                <h3 className="text-lg font-semibold text-white">Configuração do Agente IA</h3>
+                                <p className="text-white/50 text-sm">
+                                    Configure como o agente de IA deve se comportar ao analisar processos deste quadro.
+                                    As informações da Base de Conhecimento serão injetadas automaticamente no contexto.
+                                </p>
+
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-white/70 mb-2">System Prompt (Instruções Base)</label>
+                                        <textarea
+                                            value={aiConfig.system_prompt}
+                                            onChange={(e) => setAiConfig({ ...aiConfig, system_prompt: e.target.value })}
+                                            className="w-full h-40 bg-black/20 border border-white/10 rounded-xl p-4 text-white font-mono text-sm focus:outline-none focus:border-cyan-500/50 resize-none"
+                                            placeholder="Ex: Você é um especialista em processos do DNIT. Use o tom formal e cite as normas sempre que possível..."
+                                        />
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-6">
+                                        <div>
+                                            <label className="block text-sm font-medium text-white/70 mb-2">Modelo</label>
+                                            <select
+                                                value={aiConfig.model}
+                                                onChange={(e) => setAiConfig({ ...aiConfig, model: e.target.value })}
+                                                className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:border-cyan-500/50 focus:outline-none"
+                                            >
+                                                <option value="gpt-4">GPT-4 (Recomendado)</option>
+                                                <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                                                <option value="claude-3-opus">Claude 3 Opus</option>
+                                                <option value="claude-3-sonnet">Claude 3 Sonnet</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-white/70 mb-2">Criatividade (Temperatura): {aiConfig.temperature}</label>
+                                            <input
+                                                type="range"
+                                                min="0"
+                                                max="1"
+                                                step="0.1"
+                                                value={aiConfig.temperature}
+                                                onChange={(e) => setAiConfig({ ...aiConfig, temperature: parseFloat(e.target.value) })}
+                                                className="w-full accent-cyan-500"
+                                            />
+                                            <div className="flex justify-between text-xs text-white/30 mt-1">
+                                                <span>Preciso</span>
+                                                <span>Criativo</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -535,6 +618,41 @@ export default function BoardKnowledgePanel({
                         Salvar Alterações
                     </button>
                 </div>
+
+                {/* Document Preview Modal */}
+                {previewDoc && (
+                    <div className="fixed inset-0 z-[60] bg-black/90 backdrop-blur flex flex-col animate-in fade-in duration-200">
+                        <div className="flex items-center justify-between p-4 border-b border-white/10 bg-[#070b13]">
+                            <h3 className="text-white font-medium truncate">{previewDoc.name}</h3>
+                            <button
+                                onClick={() => setPreviewDoc(null)}
+                                className="p-2 hover:bg-white/10 rounded-full text-white transition"
+                            >
+                                <X size={24} />
+                            </button>
+                        </div>
+                        <div className="flex-1 overflow-hidden flex items-center justify-center p-4">
+                            {previewDoc.type.startsWith('image/') ? (
+                                <img src={previewDoc.url} alt={previewDoc.name} className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" />
+                            ) : previewDoc.type === 'application/pdf' ? (
+                                <iframe src={previewDoc.url} className="w-full h-full rounded-lg shadow-2xl bg-white" title={previewDoc.name} />
+                            ) : (
+                                <div className="text-center">
+                                    <FileText size={64} className="mx-auto text-white/20 mb-4" />
+                                    <p className="text-white text-lg mb-4">Visualização não disponível para este tipo de arquivo.</p>
+                                    <a
+                                        href={previewDoc.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="px-6 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition inline-flex items-center gap-2"
+                                    >
+                                        <Download size={18} /> Baixar Arquivo
+                                    </a>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     )

@@ -8,7 +8,8 @@ import {
   Menu,
   X,
   Layers,
-  User
+  User,
+  Search
 } from 'lucide-react'
 
 import { useSidebar } from '../contexts/SidebarContext'
@@ -134,6 +135,13 @@ export default function MainLayout(): React.ReactElement {
           </div>
 
           <div className="flex items-center gap-4">
+            <button
+              onClick={() => setIsSearchOpen(true)}
+              className="p-2 text-dark-400 hover:text-white hover:bg-white/5 rounded-lg transition"
+              title="Buscar (Ctrl+K)"
+            >
+              <Search size={20} />
+            </button>
             <NotificationCenter />
             <div className="flex items-center gap-3 pl-4 border-l border-white/10">
               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-cyan-900/20">

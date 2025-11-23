@@ -1,11 +1,13 @@
 import { supabase } from './supabase'
+import { createNotification } from './notification-service'
 import { ProcessVersion, DiffResult } from '../types/versioning'
 
 export const createVersion = async (
   processId: string,
   xml: string,
   comment: string,
-  userId: string
+  userId: string,
+  thumbnailSvg?: string
 ): Promise<ProcessVersion | null> => {
   // 1. Get current max version number
   const { data: maxVersionData } = await supabase
@@ -25,6 +27,7 @@ export const createVersion = async (
       {
         process_id: processId,
         bpmn_xml: xml,
+        thumbnail_svg: thumbnailSvg,
         version_number: nextVersionNumber,
         comment,
         status: 'approved', // Auto-approve for now, or 'pending' if workflow enabled
@@ -51,10 +54,7 @@ export const createVersion = async (
 export const getVersions = async (processId: string): Promise<ProcessVersion[]> => {
   const { data, error } = await supabase
     .from('process_versions')
-    .select(`
-      *,
-      created_by_user:profiles(full_name, email)
-    `)
+    .select('*')
     .eq('process_id', processId)
     .order('version_number', { ascending: false })
 
@@ -67,53 +67,32 @@ export const getVersions = async (processId: string): Promise<ProcessVersion[]> 
 }
 
 export const getBoardVersions = async (boardId: string): Promise<ProcessVersion[]> => {
+  // Get all process IDs for the board first
+  const { data: processes } = await supabase
+    .from('processes')
+    .select('id')
+    .eq('board_id', boardId)
+  
+  if (!processes || processes.length === 0) return []
+  
+  const processIds = processes.map((p) => p.id)
+  
   const { data, error } = await supabase
     .from('process_versions')
     .select(`
       *,
-      created_by_user:profiles(full_name, email),
       process:processes(title)
     `)
-    .eq('process.board_id', boardId) // This might not work directly if Supabase doesn't support deep filtering on join in this syntax easily without !inner
+    .in('process_id', processIds)
     .order('created_at', { ascending: false })
     .limit(50)
-
-  // Alternative if deep filtering is tricky:
-  // 1. Get all process IDs for the board
-  // 2. Get versions for those IDs
-  
+    
   if (error) {
-    // Fallback approach if the above join filter fails (Supabase sometimes needs !inner for filtering on joined tables)
-    console.log('Attempting fallback fetch for board versions...')
-    const { data: processes } = await supabase
-      .from('processes')
-      .select('id')
-      .eq('board_id', boardId)
-    
-    if (!processes || processes.length === 0) return []
-    
-    const processIds = processes.map(p => p.id)
-    
-    const { data: versions, error: versionError } = await supabase
-      .from('process_versions')
-      .select(`
-        *,
-        created_by_user:profiles(full_name, email),
-        process:processes(title)
-      `)
-      .in('process_id', processIds)
-      .order('created_at', { ascending: false })
-      .limit(50)
-      
-    if (versionError) {
-      console.error('Error fetching board versions:', versionError)
-      return []
-    }
-    return versions as any
+    console.error('Error fetching board versions:', error)
+    return []
   }
-
-  // Filter out any where process is null (if the join didn't filter correctly)
-  return (data as any).filter((v: any) => v.process)
+  
+  return data as any
 }
 
 export const restoreVersion = async (processId: string, version: ProcessVersion): Promise<void> => {
@@ -129,7 +108,8 @@ export const restoreVersion = async (processId: string, version: ProcessVersion)
     processId,
     version.bpmn_xml || '',
     `Restored from version ${version.version_number}`,
-    userData.user.id
+    userData.user.id,
+    version.thumbnail_svg || undefined
   )
 }
 
@@ -184,4 +164,39 @@ export const compareVersions = (xml1: string, xml2: string): DiffResult => {
   })
 
   return { added, removed, modified, details }
+}
+
+export const updateVersionStatus = async (
+  versionId: string,
+  status: 'approved' | 'rejected' | 'draft' | 'pending'
+): Promise<void> => {
+  const { data: version, error } = await supabase
+    .from('process_versions')
+    .update({ status })
+    .eq('id', versionId)
+    .select('*, process:processes(title)')
+    .single()
+
+  if (error) {
+    console.error('Error updating version status:', error)
+    throw error
+  }
+
+  if (version && version.created_by) {
+    const statusText = status === 'approved' ? 'aprovada' : status === 'rejected' ? 'rejeitada' : 'atualizada'
+    const title = `Versão ${status === 'approved' ? 'Aprovada' : status === 'rejected' ? 'Rejeitada' : 'Atualizada'}`
+    const message = `A versão ${version.version_number} do processo "${(version as any).process?.title || 'Desconhecido'}" foi ${statusText}.`
+
+    try {
+      await createNotification(
+        version.created_by,
+        title,
+        message,
+        `/board/${version.process_id}` // Adjust link as needed
+      )
+    } catch (notifyError) {
+      console.error('Failed to create notification:', notifyError)
+      // Don't fail the main operation if notification fails
+    }
+  }
 }

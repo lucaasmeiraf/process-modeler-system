@@ -5,6 +5,7 @@ export interface ProcessVersion {
   id: string
   process_id: string
   bpmn_xml: string | null
+  thumbnail_svg?: string | null
   version_number: number
   comment: string | null
   status: VersionStatus

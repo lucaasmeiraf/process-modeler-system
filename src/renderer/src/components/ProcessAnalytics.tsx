@@ -12,22 +12,22 @@ import {
     Cell
 } from 'recharts'
 
+import { Process } from '../types/process'
+
 interface ProcessAnalyticsProps {
     isOpen: boolean
     onClose: () => void
-    xml: string | null
-    processTitle: string
+    process: Process | null
 }
 
 export default function ProcessAnalytics({
     isOpen,
     onClose,
-    xml,
-    processTitle
+    process
 }: ProcessAnalyticsProps): React.ReactElement | null {
-    const metrics = useMemo(() => calculateProcessMetrics(xml || ''), [xml])
+    const metrics = useMemo(() => calculateProcessMetrics(process?.bpmn_xml || ''), [process?.bpmn_xml])
 
-    if (!isOpen) return null
+    if (!isOpen || !process) return null
 
     const chartData = [
         { name: 'Tarefas', value: metrics.tasks, color: '#38bdf8' },
@@ -44,7 +44,7 @@ export default function ProcessAnalytics({
                 <div className="flex items-center justify-between p-6 border-b border-white/10">
                     <div>
                         <h2 className="text-xl font-bold text-white">Análise do Processo</h2>
-                        <p className="text-sm text-white/50">{processTitle}</p>
+                        <p className="text-sm text-white/50">{process.title}</p>
                     </div>
                     <button onClick={onClose} className="text-white/50 hover:text-white transition">
                         <X size={24} />
@@ -89,37 +89,61 @@ export default function ProcessAnalytics({
                         </div>
                     </div>
 
-                    {/* Chart */}
-                    <div className="bg-white/5 p-4 rounded-xl border border-white/5 h-64">
-                        <h3 className="text-sm font-medium text-white mb-4">Distribuição de Elementos</h3>
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={chartData}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" vertical={false} />
-                                <XAxis
-                                    dataKey="name"
-                                    stroke="rgba(255,255,255,0.5)"
-                                    fontSize={12}
-                                    tickLine={false}
-                                    axisLine={false}
-                                />
-                                <YAxis
-                                    stroke="rgba(255,255,255,0.5)"
-                                    fontSize={12}
-                                    tickLine={false}
-                                    axisLine={false}
-                                />
-                                <Tooltip
-                                    contentStyle={{ backgroundColor: '#1a1d2d', borderColor: 'rgba(255,255,255,0.1)', color: '#fff' }}
-                                    itemStyle={{ color: '#fff' }}
-                                    cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                                />
-                                <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                                    {chartData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={entry.color} />
-                                    ))}
-                                </Bar>
-                            </BarChart>
-                        </ResponsiveContainer>
+                    {/* Chart & Info */}
+                    <div className="flex flex-col gap-4">
+                        <div className="bg-white/5 p-4 rounded-xl border border-white/5 h-48">
+                            <h3 className="text-sm font-medium text-white mb-4">Distribuição de Elementos</h3>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={chartData}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" vertical={false} />
+                                    <XAxis
+                                        dataKey="name"
+                                        stroke="rgba(255,255,255,0.5)"
+                                        fontSize={12}
+                                        tickLine={false}
+                                        axisLine={false}
+                                    />
+                                    <YAxis
+                                        stroke="rgba(255,255,255,0.5)"
+                                        fontSize={12}
+                                        tickLine={false}
+                                        axisLine={false}
+                                    />
+                                    <Tooltip
+                                        contentStyle={{ backgroundColor: '#1a1d2d', borderColor: 'rgba(255,255,255,0.1)', color: '#fff' }}
+                                        itemStyle={{ color: '#fff' }}
+                                        cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                                    />
+                                    <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                                        {chartData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={entry.color} />
+                                        ))}
+                                    </Bar>
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+
+                        {/* Last Modified Info */}
+                        <div className="bg-white/5 p-4 rounded-xl border border-white/5 flex-1 flex flex-col justify-center">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-xs text-white/50">Última modificação</span>
+                                <span className="text-xs text-white">{new Date(process.updated_at).toLocaleDateString()}</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs text-white/50">Criado por</span>
+                                <span className="text-xs text-white truncate max-w-[150px]">{process.created_by}</span>
+                            </div>
+                            <div className="mt-3 pt-3 border-t border-white/10 flex items-center justify-between">
+                                <span className="text-xs text-white/50">Status</span>
+                                <span className={`text-xs px-2 py-1 rounded ${process.status === 'published' ? 'bg-green-500/20 text-green-400' :
+                                        process.status === 'pending_review' ? 'bg-cyan-500/20 text-cyan-400' :
+                                            'bg-yellow-500/20 text-yellow-400'
+                                    }`}>
+                                    {process.status === 'published' ? 'Publicado' :
+                                        process.status === 'pending_review' ? 'Em Revisão' : 'Rascunho'}
+                                </span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

@@ -36,7 +36,8 @@ export const searchProcesses = async (
     dbQuery = dbQuery.ilike('department', `%${filters.department}%`)
   }
 
-  // Text Search (Basic ILIKE for now, can be upgraded to Full Text Search)
+  // If query is present, we might need to fetch MORE to search content locally
+  // For metadata search:
   if (query) {
     dbQuery = dbQuery.or(`title.ilike.%${query}%,description.ilike.%${query}%`)
   }
@@ -51,10 +52,71 @@ export const searchProcesses = async (
   // TODO: Implement content search within BPMN XML if needed (requires fetching XML or indexing it)
   // For now, we return matches based on metadata
 
-  return (data as Process[]).map((process) => ({
-    process,
-    matchType: 'title' // Simplified for now
-  }))
+  const results: SearchResult[] = []
+  const lowerQuery = query.toLowerCase()
+  const processes = data as Process[]
+
+  // Process results
+  for (const process of processes) {
+    let matchType: SearchResult['matchType'] = 'title'
+    let snippet: string | undefined
+
+    // 1. Metadata Match
+    if (process.title.toLowerCase().includes(lowerQuery)) {
+      matchType = 'title'
+    } else if (process.description?.toLowerCase().includes(lowerQuery)) {
+      matchType = 'description'
+      snippet = process.description
+    } else if (process.tags?.some((t) => t.toLowerCase().includes(lowerQuery))) {
+      matchType = 'tag'
+    }
+
+    // 2. Content Match (if no metadata match or just to add more context)
+    // We only search content if we have a query and XML
+    if (query && process.bpmn_xml) {
+      const contentMatch = searchBPMNContent(process.bpmn_xml, lowerQuery)
+      if (contentMatch) {
+        if (!matchType || matchType === 'title') {
+          // If it was just a title match or no match yet
+          matchType = 'content'
+          snippet = contentMatch
+        }
+      }
+    }
+
+    results.push({
+      process,
+      matchType,
+      snippet
+    })
+  }
+
+  return results
+}
+
+const searchBPMNContent = (xml: string, query: string): string | null => {
+  try {
+    const parser = new DOMParser()
+    const doc = parser.parseFromString(xml, 'text/xml')
+    const elements = doc.getElementsByTagName('*')
+    
+    for (let i = 0; i < elements.length; i++) {
+      const el = elements[i]
+      const name = el.getAttribute('name')
+      if (name && name.toLowerCase().includes(query)) {
+        // Found a match
+        const type = el.tagName.replace('bpmn:', '') // e.g., 'Task'
+        return `Found in ${type}: "${name}"`
+      }
+      
+      // Also check documentation/textAnnotation if needed
+      // const text = el.textContent
+      // if (text && text.toLowerCase().includes(query)) ...
+    }
+  } catch (e) {
+    console.error('XML Parse error', e)
+  }
+  return null
 }
 
 export const updateProcessMetadata = async (

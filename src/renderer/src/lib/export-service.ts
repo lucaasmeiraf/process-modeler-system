@@ -89,8 +89,8 @@ export const generatePDF = async (
     
     // Extract elements
     // @ts-ignore
-    const elementRegistry = modeler.get('elementRegistry')
-    const elements = elementRegistry.filter((element) => {
+    const elementRegistry = modeler.get('elementRegistry') as any
+    const elements = elementRegistry.filter((element: any) => {
       return (
         element.type !== 'bpmn:Process' &&
         element.type !== 'bpmn:SequenceFlow' &&
@@ -103,7 +103,7 @@ export const generatePDF = async (
     let yPos = 40
     pdf.setFontSize(12)
 
-    elements.forEach((element) => {
+    elements.forEach((element: any) => {
       // Check for page break
       if (yPos > pageHeight - 30) {
         pdf.addPage()

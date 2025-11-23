@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react'
 import { formatDistanceToNow } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { History, RotateCcw, GitCompare, X } from 'lucide-react'
+import { History, RotateCcw, GitCompare, X, CheckCircle, XCircle } from 'lucide-react'
 import { ProcessVersion } from '../types/versioning'
-import { getVersions, restoreVersion, getBoardVersions } from '../lib/version-service'
+import { getVersions, restoreVersion, getBoardVersions, updateVersionStatus } from '../lib/version-service'
 
 interface VersionHistoryPanelProps {
     processId?: string
@@ -62,6 +62,17 @@ export default function VersionHistoryPanel({
             alert('Erro ao restaurar versão')
         } finally {
             setRestoringId(null)
+        }
+    }
+
+    const handleStatusChange = async (version: ProcessVersion, status: 'approved' | 'rejected') => {
+        try {
+            await updateVersionStatus(version.id, status)
+            // Optimistic update
+            setVersions(versions.map(v => v.id === version.id ? { ...v, status } : v))
+        } catch (error) {
+            console.error('Failed to update status', error)
+            alert('Erro ao atualizar status')
         }
     }
 
@@ -135,32 +146,70 @@ export default function VersionHistoryPanel({
                                     </div>
                                 )}
 
+                                {version.thumbnail_svg && (
+                                    <div className="mb-3 rounded-lg overflow-hidden border border-white/10 bg-white/5 p-2">
+                                        <img
+                                            src={`data:image/svg+xml;utf8,${encodeURIComponent(version.thumbnail_svg)}`}
+                                            alt={`Thumbnail v${version.version_number}`}
+                                            className="w-full h-auto opacity-80 hover:opacity-100 transition-opacity"
+                                        />
+                                    </div>
+                                )}
+
                                 {version.comment && (
                                     <p className="text-sm text-dark-300 mb-3 italic border-l-2 border-white/10 pl-2">
                                         "{version.comment}"
                                     </p>
                                 )}
 
-                                <div className="flex gap-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button
-                                        onClick={() => handleRestore(version)}
-                                        disabled={restoringId === version.id}
-                                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded bg-white/5 hover:bg-white/10 text-xs text-white transition disabled:opacity-50"
-                                    >
-                                        {restoringId === version.id ? (
-                                            <span className="animate-spin">⌛</span>
-                                        ) : (
-                                            <RotateCcw size={14} />
-                                        )}
-                                        Restaurar
-                                    </button>
-                                    <button
-                                        onClick={() => onCompare(version)}
-                                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded bg-white/5 hover:bg-white/10 text-xs text-white transition"
-                                    >
-                                        <GitCompare size={14} />
-                                        Comparar
-                                    </button>
+                                <div className="flex flex-col gap-2 mt-2">
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => handleRestore(version)}
+                                            disabled={restoringId === version.id}
+                                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded bg-white/5 hover:bg-white/10 text-xs text-white transition disabled:opacity-50"
+                                        >
+                                            {restoringId === version.id ? (
+                                                <span className="animate-spin">⌛</span>
+                                            ) : (
+                                                <RotateCcw size={14} />
+                                            )}
+                                            Restaurar
+                                        </button>
+                                        <button
+                                            onClick={() => onCompare(version)}
+                                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded bg-white/5 hover:bg-white/10 text-xs text-white transition"
+                                        >
+                                            <GitCompare size={14} />
+                                            Comparar
+                                        </button>
+                                    </div>
+
+                                    {/* Approval Actions */}
+                                    <div className="flex gap-2 border-t border-white/5 pt-2">
+                                        <button
+                                            onClick={() => handleStatusChange(version, 'approved')}
+                                            disabled={version.status === 'approved'}
+                                            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded text-xs transition ${version.status === 'approved'
+                                                    ? 'bg-green-500/20 text-green-300 cursor-default'
+                                                    : 'bg-white/5 hover:bg-green-500/20 hover:text-green-300 text-dark-300'
+                                                }`}
+                                        >
+                                            <CheckCircle size={14} />
+                                            Aprovar
+                                        </button>
+                                        <button
+                                            onClick={() => handleStatusChange(version, 'rejected')}
+                                            disabled={version.status === 'rejected'}
+                                            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded text-xs transition ${version.status === 'rejected'
+                                                    ? 'bg-red-500/20 text-red-300 cursor-default'
+                                                    : 'bg-white/5 hover:bg-red-500/20 hover:text-red-300 text-dark-300'
+                                                }`}
+                                        >
+                                            <XCircle size={14} />
+                                            Rejeitar
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         ))
