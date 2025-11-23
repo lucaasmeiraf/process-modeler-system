@@ -11,6 +11,7 @@ import { Board } from '../types/board'
 import BoardKnowledgePanel from '../components/BoardKnowledgePanel'
 import VersionHistoryPanel from '../components/VersionHistoryPanel'
 import ProcessDiffViewer from '../components/ProcessDiffViewer'
+import { createVersion } from '../lib/version-service'
 import { ProcessVersion } from '../types/versioning'
 import ProcessAnalytics from '../components/ProcessAnalytics'
 import BoardAnalytics from '../components/BoardAnalytics'
@@ -229,16 +230,27 @@ export default function ProcessesPage() {
   }
 
   const handleSave = async () => {
-    if (!selectedProcess || !modeler) return
+    if (!selectedProcess || !modeler || !user) return
     setSaving(true)
 
     try {
       const { xml } = await modeler.saveXML({ format: true })
 
+      if (!xml) return
+
+      // Create a new version in history
+      await createVersion(
+        selectedProcess.id,
+        xml,
+        'Salvo manualmente', // Default comment since prompt is tricky in Electron
+        user.id
+      )
+
+      // Also update the main process record (current draft)
       const { error } = await supabase
         .from('processes')
         .update({
-          bpmn_xml: xml || null,
+          bpmn_xml: xml,
           updated_at: new Date().toISOString()
         })
         .eq('id', selectedProcess.id)
@@ -246,8 +258,11 @@ export default function ProcessesPage() {
       if (error) throw error
 
       setProcesses(
-        processes.map((p) => (p.id === selectedProcess.id ? { ...p, bpmn_xml: xml || null } : p))
+        processes.map((p) => (p.id === selectedProcess.id ? { ...p, bpmn_xml: xml } : p))
       )
+
+      // Optional: Show success feedback
+      // alert('Processo salvo e nova versão criada!') 
     } catch (error) {
       console.error('Error saving process:', error)
       alert('Failed to save process.')
