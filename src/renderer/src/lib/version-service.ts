@@ -66,6 +66,56 @@ export const getVersions = async (processId: string): Promise<ProcessVersion[]> 
   return data as any
 }
 
+export const getBoardVersions = async (boardId: string): Promise<ProcessVersion[]> => {
+  const { data, error } = await supabase
+    .from('process_versions')
+    .select(`
+      *,
+      created_by_user:profiles(full_name, email),
+      process:processes(title)
+    `)
+    .eq('process.board_id', boardId) // This might not work directly if Supabase doesn't support deep filtering on join in this syntax easily without !inner
+    .order('created_at', { ascending: false })
+    .limit(50)
+
+  // Alternative if deep filtering is tricky:
+  // 1. Get all process IDs for the board
+  // 2. Get versions for those IDs
+  
+  if (error) {
+    // Fallback approach if the above join filter fails (Supabase sometimes needs !inner for filtering on joined tables)
+    console.log('Attempting fallback fetch for board versions...')
+    const { data: processes } = await supabase
+      .from('processes')
+      .select('id')
+      .eq('board_id', boardId)
+    
+    if (!processes || processes.length === 0) return []
+    
+    const processIds = processes.map(p => p.id)
+    
+    const { data: versions, error: versionError } = await supabase
+      .from('process_versions')
+      .select(`
+        *,
+        created_by_user:profiles(full_name, email),
+        process:processes(title)
+      `)
+      .in('process_id', processIds)
+      .order('created_at', { ascending: false })
+      .limit(50)
+      
+    if (versionError) {
+      console.error('Error fetching board versions:', versionError)
+      return []
+    }
+    return versions as any
+  }
+
+  // Filter out any where process is null (if the join didn't filter correctly)
+  return (data as any).filter((v: any) => v.process)
+}
+
 export const restoreVersion = async (processId: string, version: ProcessVersion): Promise<void> => {
   // Update process with the XML from the selected version
   // We do NOT delete newer versions, just update the current state
