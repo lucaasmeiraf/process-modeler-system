@@ -40,10 +40,7 @@ export default function BPMNModeler({
     if (!containerRef.current) return
 
     const modeler = new BpmnModeler({
-      container: containerRef.current,
-      keyboard: {
-        bindTo: document
-      }
+      container: containerRef.current
     })
 
     modelerRef.current = modeler
@@ -80,13 +77,16 @@ export default function BPMNModeler({
     if (modelerRef.current) {
       const importXml = async (): Promise<void> => {
         try {
+          // Small delay to ensure canvas is fully initialized
+          await new Promise(resolve => setTimeout(resolve, 50))
+
           await modelerRef.current!.importXML(xml || emptyBpmn)
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const canvas = modelerRef.current!.get('canvas') as any
           canvas.zoom('fit-viewport')
+          setLoading(false)
         } catch (err) {
           console.error('Error importing XML:', err)
-        } finally {
           setLoading(false)
         }
       }

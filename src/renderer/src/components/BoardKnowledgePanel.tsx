@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
-import { Board, GlossaryTerm, SystemItem, LegislationItem, OrgItem } from '../types/board'
+import { Board, GlossaryTerm, SystemItem, LegislationItem, OrgItem, BoardDocument } from '../types/board'
 import { updateBoardKnowledgeBase } from '../lib/board-service'
-import { X, Save, Plus, Trash2, Book, Database, Scale, Users, FileText, Loader2 } from 'lucide-react'
+import { supabase } from '../lib/supabase'
+import { X, Save, Plus, Trash2, Book, Database, Scale, Users, FileText, Loader2, Upload, Download, File } from 'lucide-react'
 import { v4 as uuidv4 } from 'uuid'
 
-type Tab = 'context' | 'glossary' | 'systems' | 'legislation' | 'org'
+type Tab = 'context' | 'glossary' | 'systems' | 'legislation' | 'org' | 'documents'
 
 interface BoardKnowledgePanelProps {
     board: Board
@@ -28,6 +29,8 @@ export default function BoardKnowledgePanel({
     const [systems, setSystems] = useState<SystemItem[]>(board.integrated_systems || [])
     const [legislation, setLegislation] = useState<LegislationItem[]>(board.legislation || [])
     const [orgStructure, setOrgStructure] = useState<OrgItem[]>(board.org_structure || [])
+    const [documents, setDocuments] = useState<BoardDocument[]>(board.documents || [])
+    const [uploading, setUploading] = useState(false)
 
     useEffect(() => {
         if (isOpen) {
@@ -36,8 +39,65 @@ export default function BoardKnowledgePanel({
             setSystems(board.integrated_systems || [])
             setLegislation(board.legislation || [])
             setOrgStructure(board.org_structure || [])
+            setDocuments(board.documents || [])
         }
     }, [isOpen, board])
+
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+
+        setUploading(true)
+        try {
+            // Upload to Supabase Storage
+            const fileExt = file.name.split('.').pop()
+            const fileName = `${board.id}/${uuidv4()}.${fileExt}`
+
+            const { data: uploadData, error: uploadError } = await supabase.storage
+                .from('board-documents')
+                .upload(fileName, file)
+
+            if (uploadError) throw uploadError
+
+            // Get public URL
+            const { data: urlData } = supabase.storage
+                .from('board-documents')
+                .getPublicUrl(fileName)
+
+            const newDoc: BoardDocument = {
+                id: uuidv4(),
+                name: file.name,
+                url: urlData.publicUrl,
+                type: file.type,
+                size: file.size,
+                uploaded_at: new Date().toISOString()
+            }
+
+            setDocuments([...documents, newDoc])
+        } catch (error) {
+            console.error('Upload error:', error)
+            alert('Falha ao fazer upload do arquivo')
+        } finally {
+            setUploading(false)
+            // Reset input
+            e.target.value = ''
+        }
+    }
+
+    const handleDeleteDocument = async (doc: BoardDocument) => {
+        try {
+            // Extract file path from URL
+            const urlParts = doc.url.split('/board-documents/')
+            if (urlParts.length > 1) {
+                const filePath = urlParts[1].split('?')[0]
+                await supabase.storage.from('board-documents').remove([filePath])
+            }
+            setDocuments(documents.filter(d => d.id !== doc.id))
+        } catch (error) {
+            console.error('Delete error:', error)
+            alert('Falha ao deletar arquivo')
+        }
+    }
 
     const handleSave = async () => {
         setSaving(true)
@@ -47,7 +107,8 @@ export default function BoardKnowledgePanel({
                 glossary,
                 integrated_systems: systems,
                 legislation,
-                org_structure: orgStructure
+                org_structure: orgStructure,
+                documents
             })
             if (updated) {
                 onUpdate(updated)
@@ -113,6 +174,12 @@ export default function BoardKnowledgePanel({
                             onClick={() => setActiveTab('org')}
                             icon={<Users size={18} />}
                             label="Estrutura Org."
+                        />
+                        <TabButton
+                            active={activeTab === 'documents'}
+                            onClick={() => setActiveTab('documents')}
+                            icon={<File size={18} />}
+                            label="Documentos"
                         />
                     </div>
 
@@ -379,6 +446,75 @@ export default function BoardKnowledgePanel({
                                 </div>
                             </div>
                         )}
+
+                        {activeTab === 'documents' && (
+                            <div className="space-y-6">
+                                <div className="flex justify-between items-center">
+                                    <h3 className="text-lg font-semibold text-white">Documentos e Anexos</h3>
+                                    <label className="flex items-center gap-2 px-3 py-1.5 bg-cyan-500/10 text-cyan-400 rounded-lg hover:bg-cyan-500/20 transition text-sm font-medium cursor-pointer">
+                                        {uploading ? (
+                                            <>
+                                                <Loader2 className="animate-spin" size={16} />
+                                                Enviando...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Upload size={16} /> Upload Arquivo
+                                                <input
+                                                    type="file"
+                                                    onChange={handleFileUpload}
+                                                    className="hidden"
+                                                    accept=".pdf,.doc,.docx,.xls,.xlsx,.txt"
+                                                    disabled={uploading}
+                                                />
+                                            </>
+                                        )}
+                                    </label>
+                                </div>
+                                <div className="space-y-3">
+                                    {documents.map((doc) => (
+                                        <div key={doc.id} className="flex items-center justify-between bg-white/5 p-4 rounded-xl border border-white/5 hover:border-white/10 transition">
+                                            <div className="flex items-center gap-3 flex-1">
+                                                <div className="p-2 bg-cyan-500/10 rounded-lg">
+                                                    <File className="text-cyan-400" size={20} />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-white font-medium text-sm truncate">{doc.name}</p>
+                                                    <p className="text-white/40 text-xs">
+                                                        {doc.size ? `${(doc.size / 1024).toFixed(1)} KB` : 'Tamanho desconhecido'} • {new Date(doc.uploaded_at).toLocaleDateString('pt-BR')}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <a
+                                                    href={doc.url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="p-2 hover:bg-white/10 rounded-lg text-cyan-400 hover:text-cyan-300 transition"
+                                                    title="Visualizar"
+                                                >
+                                                    <Download size={18} />
+                                                </a>
+                                                <button
+                                                    onClick={() => handleDeleteDocument(doc)}
+                                                    className="p-2 hover:bg-white/10 rounded-lg text-red-400 hover:text-red-300 transition"
+                                                    title="Deletar"
+                                                >
+                                                    <Trash2 size={18} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {documents.length === 0 && (
+                                        <div className="text-center py-12">
+                                            <File className="mx-auto text-white/20 mb-3" size={48} />
+                                            <p className="text-white/30 italic">Nenhum documento anexado.</p>
+                                            <p className="text-white/20 text-sm mt-1">Faça upload de PDFs, manuais ou documentos de referência.</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -409,8 +545,8 @@ function TabButton({ active, onClick, icon, label }: { active: boolean; onClick:
         <button
             onClick={onClick}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${active
-                    ? 'bg-gradient-to-r from-cyan-500/10 to-blue-500/10 text-cyan-400 border border-cyan-500/20'
-                    : 'text-white/50 hover:text-white hover:bg-white/5 border border-transparent'
+                ? 'bg-gradient-to-r from-cyan-500/10 to-blue-500/10 text-cyan-400 border border-cyan-500/20'
+                : 'text-white/50 hover:text-white hover:bg-white/5 border border-transparent'
                 }`}
         >
             {icon}
