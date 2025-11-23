@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import { X, Save, Plus, Trash2, Book, Database, Scale, Users, FileText, Loader2, Upload, Download, File, Bot, Eye } from 'lucide-react'
 import { v4 as uuidv4 } from 'uuid'
 import MDEditor from '@uiw/react-md-editor'
+import { toast } from 'sonner'
 
 type Tab = 'context' | 'glossary' | 'systems' | 'legislation' | 'org' | 'documents' | 'ai_config'
 
@@ -86,9 +87,10 @@ export default function BoardKnowledgePanel({
             }
 
             setDocuments([...documents, newDoc])
+            toast.success('Arquivo enviado com sucesso!')
         } catch (error) {
             console.error('Upload error:', error)
-            alert('Falha ao fazer upload do arquivo')
+            toast.error('Falha ao fazer upload do arquivo')
         } finally {
             setUploading(false)
             // Reset input
@@ -105,9 +107,10 @@ export default function BoardKnowledgePanel({
                 await supabase.storage.from('board-documents').remove([filePath])
             }
             setDocuments(documents.filter(d => d.id !== doc.id))
+            toast.success('Arquivo excluído com sucesso!')
         } catch (error) {
             console.error('Delete error:', error)
-            alert('Falha ao deletar arquivo')
+            toast.error('Falha ao deletar arquivo')
         }
     }
 
@@ -125,10 +128,11 @@ export default function BoardKnowledgePanel({
             })
             if (updated) {
                 onUpdate(updated)
+                toast.success('Base de conhecimento salva com sucesso!')
                 onClose()
             }
         } catch (error) {
-            alert('Failed to save knowledge base')
+            toast.error('Falha ao salvar base de conhecimento')
         } finally {
             setSaving(false)
         }
@@ -138,9 +142,9 @@ export default function BoardKnowledgePanel({
 
     return (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-[#0b101b] w-full max-w-6xl h-[90vh] rounded-2xl border border-white/10 shadow-2xl flex flex-col overflow-hidden">
+            <div className="bg-dark-900 w-full max-w-6xl h-[90vh] rounded-2xl border border-white/10 shadow-2xl flex flex-col overflow-hidden">
                 {/* Header */}
-                <div className="p-6 border-b border-white/10 flex justify-between items-center bg-[#070b13]">
+                <div className="p-6 border-b border-white/10 flex justify-between items-center bg-dark-950">
                     <div>
                         <h2 className="text-2xl font-bold text-white">Base de Conhecimento</h2>
                         <p className="text-white/50 text-sm">Gerencie o contexto e informações do setor {board.name}</p>
@@ -157,7 +161,7 @@ export default function BoardKnowledgePanel({
 
                 <div className="flex flex-1 overflow-hidden">
                     {/* Sidebar Tabs */}
-                    <div className="w-64 bg-[#05080f] border-r border-white/5 p-4 space-y-2 overflow-y-auto">
+                    <div className="w-64 bg-dark-950 border-r border-white/5 p-4 space-y-2 overflow-y-auto">
                         <TabButton
                             active={activeTab === 'context'}
                             onClick={() => setActiveTab('context')}
@@ -204,7 +208,7 @@ export default function BoardKnowledgePanel({
                     </div>
 
                     {/* Content Area */}
-                    <div className="flex-1 overflow-y-auto p-8 bg-[#0b101b]">
+                    <div className="flex-1 overflow-y-auto p-8 bg-dark-900">
                         {activeTab === 'context' && (
                             <div className="space-y-4 h-full flex flex-col">
                                 <h3 className="text-lg font-semibold text-white mb-2">Contexto do Setor (Rich Text)</h3>
@@ -602,7 +606,7 @@ export default function BoardKnowledgePanel({
                 </div>
 
                 {/* Footer */}
-                <div className="p-6 border-t border-white/10 bg-[#070b13] flex justify-end gap-3">
+                <div className="p-6 border-t border-white/10 bg-dark-950 flex justify-end gap-3">
                     <button
                         onClick={onClose}
                         className="px-4 py-2 rounded-lg text-white/60 hover:text-white hover:bg-white/5 transition"
@@ -622,7 +626,7 @@ export default function BoardKnowledgePanel({
                 {/* Document Preview Modal */}
                 {previewDoc && (
                     <div className="fixed inset-0 z-[60] bg-black/90 backdrop-blur flex flex-col animate-in fade-in duration-200">
-                        <div className="flex items-center justify-between p-4 border-b border-white/10 bg-[#070b13]">
+                        <div className="flex items-center justify-between p-4 border-b border-white/10 bg-dark-950">
                             <h3 className="text-white font-medium truncate">{previewDoc.name}</h3>
                             <button
                                 onClick={() => setPreviewDoc(null)}

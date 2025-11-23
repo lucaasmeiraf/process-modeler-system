@@ -1,6 +1,7 @@
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { SidebarProvider } from './contexts/SidebarContext'
+import { Toaster } from 'sonner'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import SettingsPage from './pages/Settings'
@@ -28,6 +29,7 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 function App(): React.JSX.Element {
   return (
     <AuthProvider>
+      <Toaster position="top-right" theme="dark" richColors />
       <SidebarProvider>
         <Router>
           <Routes>

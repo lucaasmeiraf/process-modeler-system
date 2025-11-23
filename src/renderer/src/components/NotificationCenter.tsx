@@ -59,7 +59,7 @@ export default function NotificationCenter(): React.ReactElement {
                         className="fixed inset-0 z-40"
                         onClick={() => setIsOpen(false)}
                     />
-                    <div className="absolute right-0 mt-2 w-80 bg-dark-100 border border-white/10 rounded-lg shadow-xl z-50 animate-in fade-in zoom-in-95 duration-200">
+                    <div className="absolute right-0 mt-2 w-80 bg-dark-900 border border-white/10 rounded-lg shadow-xl z-50 animate-in fade-in zoom-in-95 duration-200">
                         <div className="p-3 border-b border-white/10 flex items-center justify-between">
                             <h3 className="font-semibold text-white text-sm">Notificações</h3>
                             {unreadCount > 0 && (

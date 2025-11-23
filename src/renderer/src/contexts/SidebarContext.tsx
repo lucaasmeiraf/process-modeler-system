@@ -7,14 +7,14 @@ type SidebarContextProps = {
 
 const SidebarContext = createContext<SidebarContextProps>({
   hideSidebar: false,
-  setHideSidebar: () => {}
+  setHideSidebar: () => { }
 })
 
 type SidebarProviderProps = {
   children: ReactNode
 }
 
-export function SidebarProvider({ children }: SidebarProviderProps): JSX.Element {
+export function SidebarProvider({ children }: SidebarProviderProps): ReactNode {
   const [hideSidebar, setHideSidebar] = useState(false)
 
   return (
