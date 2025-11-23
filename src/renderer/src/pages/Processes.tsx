@@ -9,6 +9,11 @@ import { AgentService, getStoredAgents, ChatMessage } from '../lib/ai/agent-serv
 import { getBoard } from '../lib/board-service'
 import { Board } from '../types/board'
 import BoardKnowledgePanel from '../components/BoardKnowledgePanel'
+import VersionHistoryPanel from '../components/VersionHistoryPanel'
+import ProcessDiffViewer from '../components/ProcessDiffViewer'
+import { ProcessVersion } from '../types/versioning'
+import ProcessAnalytics from '../components/ProcessAnalytics'
+import BoardAnalytics from '../components/BoardAnalytics'
 import {
   ArrowLeft,
   Plus,
@@ -22,18 +27,15 @@ import {
   Image as ImageIcon,
   Download,
   ChevronDown,
+  History,
+  BarChart2,
+  PieChart,
   BookOpen
 } from 'lucide-react'
 import BpmnModeler from 'bpmn-js/lib/Modeler'
 import { downloadXML, downloadSVG, generatePDF } from '../lib/export-service'
 
-type Process = {
-  id: string
-  title: string
-  description: string | null
-  bpmn_xml: string | null
-  updated_at: string
-}
+import { Process } from '../types/process'
 
 export default function ProcessesPage() {
   const { boardId } = useParams()
@@ -43,6 +45,12 @@ export default function ProcessesPage() {
 
   const [board, setBoard] = useState<Board | null>(null)
   const [showKnowledgePanel, setShowKnowledgePanel] = useState(false)
+
+  // Versioning State
+  const [showHistoryPanel, setShowHistoryPanel] = useState(false)
+  const [compareVersion, setCompareVersion] = useState<ProcessVersion | null>(null)
+  const [showAnalytics, setShowAnalytics] = useState(false)
+  const [showBoardAnalytics, setShowBoardAnalytics] = useState(false)
 
   const [processes, setProcesses] = useState<Process[]>([])
   const [selectedProcess, setSelectedProcess] = useState<Process | null>(null)
@@ -358,7 +366,17 @@ export default function ProcessesPage() {
 
   const renderCreateModal = showCreateModal && (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-lg flex items-center justify-center z-50">
-      <div className="bg-[#060a12] rounded-2xl shadow-[0_30px_80px_rgba(0,0,0,0.7)] w-full max-w-md border border-white/10 p-6 m-4">
+      <div className="bg-dark-900 rounded-2xl shadow-[0_30px_80px_rgba(0,0,0,0.7)] w-full max-w-md border border-white/10 p-6 m-4">
+        <div className="flex items-center gap-4">
+          <h1 className="text-2xl font-bold text-white">{board?.name || 'Carregando...'}</h1>
+          <button
+            onClick={() => setShowBoardAnalytics(true)}
+            className="p-2 text-dark-400 hover:text-white hover:bg-white/5 rounded-lg transition"
+            title="Dashboard do Quadro"
+          >
+            <PieChart size={20} />
+          </button>
+        </div>
         <h2 className="text-xl font-bold text-white mb-1">Create New Process</h2>
         <p className="text-sm text-white/60 mb-6">Enter a title for your new process</p>
 
@@ -390,7 +408,7 @@ export default function ProcessesPage() {
             <button
               type="submit"
               disabled={createLoading}
-              className="px-4 py-2 bg-gradient-to-r from-cyan-400 to-blue-500 hover:opacity-90 text-dark-950 font-bold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-4 py-2 bg-gradient-to-r from-cyan-400 to-blue-500 hover:opacity-90 text-white font-bold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {createLoading ? (
                 <>
@@ -410,7 +428,7 @@ export default function ProcessesPage() {
   if (!selectedProcess) {
     return (
       <>
-        <div className="p-10 h-full overflow-y-auto bg-gradient-to-br from-[#05070d] via-[#090f1c] to-[#010203] text-white">
+        <div className="p-10 h-full overflow-y-auto text-white">
           <div className="flex items-center gap-4 mb-8">
             <button
               onClick={() => navigate('/')}
@@ -419,17 +437,31 @@ export default function ProcessesPage() {
               <ArrowLeft size={24} />
             </button>
             <div>
-              <p className="text-xs uppercase tracking-[0.3em] text-cyan-300/70">Fluxos ativos</p>
-              <h1 className="text-3xl font-bold">Processes</h1>
+              <p className="text-xs uppercase tracking-[0.3em] text-cyan-300/70 mb-1">Fluxos ativos</p>
+              <h1 className="text-3xl font-bold text-white">{board?.name || 'Carregando...'}</h1>
               <p className="text-dark-300 text-sm">Selecione um processo para editar ou crie um novo fluxo.</p>
             </div>
             <div className="ml-auto flex gap-3">
+              <button
+                onClick={() => setShowAnalytics(true)}
+                className="p-2 text-dark-400 hover:text-white hover:bg-white/5 rounded-lg transition"
+                title="Análise do Processo"
+              >
+                <BarChart2 size={20} />
+              </button>
               <button
                 onClick={() => setShowKnowledgePanel(true)}
                 className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-white font-semibold hover:bg-white/10 transition"
               >
                 <BookOpen size={20} />
                 <span>Base de Conhecimento</span>
+              </button>
+              <button
+                onClick={() => setShowHistoryPanel(true)}
+                className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-white font-semibold hover:bg-white/10 transition"
+              >
+                <History size={20} />
+                <span>Histórico</span>
               </button>
               <button
                 onClick={() => setShowCreateModal(true)}
@@ -484,7 +516,7 @@ export default function ProcessesPage() {
   }
 
   return (
-    <div className="flex h-full bg-gradient-to-br from-[#04060a] via-[#060b14] to-[#010203] text-white">
+    <div className="flex h-full text-white">
       {/* Left Column: Process Details + Chat (25%) */}
       <div className="w-[25%] min-w-[320px] border-r border-white/5 bg-white/5 backdrop-blur-xl flex flex-col">
         <div className="p-5 border-b border-white/5 flex flex-col gap-4">
@@ -758,7 +790,7 @@ export default function ProcessesPage() {
       </div>
 
       {/* Right Column: Activity Details (25%) */}
-      <div className="w-[25%] min-w-[320px] border-l border-white/5 bg-[#070b13]/90 backdrop-blur-2xl flex flex-col">
+      <div className="w-[25%] min-w-[320px] border-l border-white/5 bg-white/5 backdrop-blur-xl flex flex-col">
         <PropertiesPanel modeler={modeler} element={selectedElement} />
       </div>
       {renderCreateModal}
@@ -768,6 +800,46 @@ export default function ProcessesPage() {
           isOpen={showKnowledgePanel}
           onClose={() => setShowKnowledgePanel(false)}
           onUpdate={setBoard}
+        />
+      )}
+
+      {selectedProcess && (
+        <VersionHistoryPanel
+          processId={selectedProcess.id}
+          isOpen={showHistoryPanel}
+          onClose={() => setShowHistoryPanel(false)}
+          onRestore={() => {
+            // Refresh process logic if needed, or just reload page/xml
+            // For now, we might need to re-fetch the process or just let the user see the updated XML if we updated state
+            fetchProcesses() // Reload list to update version number
+          }}
+          onCompare={setCompareVersion}
+        />
+      )}
+
+      {compareVersion && (
+        <ProcessDiffViewer
+          currentXml={xml}
+          compareVersion={compareVersion}
+          onClose={() => setCompareVersion(null)}
+        />
+      )}
+
+      {selectedProcess && (
+        <ProcessAnalytics
+          isOpen={showAnalytics}
+          onClose={() => setShowAnalytics(false)}
+          xml={xml}
+          processTitle={selectedProcess.title}
+        />
+      )}
+
+      {board && (
+        <BoardAnalytics
+          isOpen={showBoardAnalytics}
+          onClose={() => setShowBoardAnalytics(false)}
+          processes={processes}
+          boardName={board.name}
         />
       )}
     </div>

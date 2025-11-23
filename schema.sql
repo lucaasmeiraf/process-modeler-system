@@ -65,25 +65,37 @@ create table processes (
   title text not null,
   description text,
   bpmn_xml text,
-  status text default 'draft',
-  version integer default 1,
-  created_by uuid references profiles(id),
-  updated_at timestamp with time zone default timezone('utc'::text, now()) not null,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
--- Enable RLS
-alter table processes enable row level security;
+-- Enable RLS for versions
+alter table process_versions enable row level security;
 
--- Policies for processes
-create policy "Processes are viewable by everyone." on processes
+create policy "Versions are viewable by everyone." on process_versions
   for select using (true);
 
-create policy "Authenticated users can create processes." on processes
+create policy "Authenticated users can create versions." on process_versions
   for insert with check (auth.role() = 'authenticated');
 
-create policy "Users can update processes." on processes
-  for update using (auth.role() = 'authenticated');
+-- Create a table for notifications
+create table notifications (
+  id uuid default uuid_generate_v4() primary key,
+  user_id uuid references profiles(id) on delete cascade not null,
+  title text not null,
+  message text,
+  link text,
+  read boolean default false,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- Enable RLS for notifications
+alter table notifications enable row level security;
+
+create policy "Users can view their own notifications." on notifications
+  for select using (auth.uid() = user_id);
+
+create policy "Users can update their own notifications." on notifications
+  for update using (auth.uid() = user_id);
 
 -- Create a table for agents
 create table agents (

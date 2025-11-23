@@ -29,12 +29,7 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#04060a] via-[#080d19] to-[#000105] font-sans relative overflow-hidden px-4">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.15),_transparent_60%)] pointer-events-none" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom,_rgba(129,140,248,0.12),_transparent_65%)] pointer-events-none" />
-      <div className="absolute -right-24 top-1/2 w-72 h-72 bg-cyan-500/20 blur-[160px]" />
-      <div className="absolute -left-24 top-1/3 w-72 h-72 bg-blue-500/10 blur-[180px]" />
-
+    <div className="min-h-screen flex items-center justify-center bg-dark-900 font-sans relative overflow-hidden px-4">
       <div className="relative w-full max-w-xl bg-white/5 backdrop-blur-3xl px-10 py-12 rounded-[32px] border border-white/10 shadow-[0_40px_120px_rgba(0,0,0,0.65)]">
         <div className="text-center mb-10">
           <p className="text-[11px] uppercase tracking-[0.6em] text-cyan-300/80 mb-3">Workspace</p>
