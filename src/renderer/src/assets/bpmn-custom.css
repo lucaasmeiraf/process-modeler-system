@@ -1,0 +1,48 @@
+.djs-container {
+  background-color: transparent !important;
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+}
+
+.djs-container .viewport {
+  background-color: transparent !important;
+}
+
+.djs-context-pad {
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+}
+
+.djs-palette {
+  background: rgba(5, 7, 13, 0.92);
+  color: #e2e8f0;
+  border-radius: 20px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+}
+
+.djs-palette .entry {
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid transparent;
+  color: #cbd5f5;
+}
+
+.djs-palette .entry:hover {
+  border-color: rgba(56, 189, 248, 0.5);
+  color: #22d3ee;
+  background: rgba(56, 189, 248, 0.15);
+}
+
+.djs-context-pad .entry {
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.9);
+  color: #f1f5f9;
+}
+
+.djs-context-pad .entry:hover {
+  background: rgba(56, 189, 248, 0.2);
+  color: #22d3ee;
+}
+
