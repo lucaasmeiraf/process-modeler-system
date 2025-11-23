@@ -1,4 +1,5 @@
-import { BPMN_SYSTEM_PROMPT } from './prompts'
+import { BPMN_SYSTEM_PROMPT, generateSystemPromptWithContext } from './prompts'
+import { Board } from '../../types/board'
 
 export type AgentProvider = 'openai' | 'anthropic' | 'custom'
 
@@ -22,9 +23,11 @@ export class AgentService {
     this.config = config
   }
 
-  async generateBPMN(messages: ChatMessage[]): Promise<string> {
+  async generateBPMN(messages: ChatMessage[], board?: Board): Promise<string> {
+    const systemPrompt = board ? generateSystemPromptWithContext(board) : BPMN_SYSTEM_PROMPT
+    
     const fullMessages: ChatMessage[] = [
-      { role: 'system', content: BPMN_SYSTEM_PROMPT },
+      { role: 'system', content: systemPrompt },
       ...messages
     ]
 
@@ -177,7 +180,7 @@ export const getStoredAgents = (): AgentConfig[] => {
   return stored ? JSON.parse(stored) : []
 }
 
-export const saveAgent = (agent: AgentConfig) => {
+export const saveAgent = (agent: AgentConfig): void => {
   const agents = getStoredAgents()
   const index = agents.findIndex((a) => a.id === agent.id)
   if (index >= 0) {
@@ -188,7 +191,7 @@ export const saveAgent = (agent: AgentConfig) => {
   localStorage.setItem('dnit_bpmn_agents', JSON.stringify(agents))
 }
 
-export const deleteAgent = (id: string) => {
+export const deleteAgent = (id: string): void => {
   const agents = getStoredAgents().filter((a) => a.id !== id)
   localStorage.setItem('dnit_bpmn_agents', JSON.stringify(agents))
 }

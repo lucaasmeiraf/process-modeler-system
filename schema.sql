@@ -26,6 +26,12 @@ create table boards (
   name text not null,
   description text,
   created_by uuid references profiles(id),
+  context_md text,
+  glossary jsonb default '[]'::jsonb,
+  integrated_systems jsonb default '[]'::jsonb,
+  legislation jsonb default '[]'::jsonb,
+  org_structure jsonb default '{}'::jsonb,
+  documents jsonb default '[]'::jsonb,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 

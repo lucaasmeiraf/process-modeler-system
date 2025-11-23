@@ -6,6 +6,9 @@ import { useSidebar } from '../contexts/SidebarContext'
 import BPMNModeler from '../components/BPMNModeler'
 import PropertiesPanel from '../components/PropertiesPanel'
 import { AgentService, getStoredAgents, ChatMessage } from '../lib/ai/agent-service'
+import { getBoard } from '../lib/board-service'
+import { Board } from '../types/board'
+import BoardKnowledgePanel from '../components/BoardKnowledgePanel'
 import {
   ArrowLeft,
   Plus,
@@ -18,7 +21,8 @@ import {
   Mic,
   Image as ImageIcon,
   Download,
-  ChevronDown
+  ChevronDown,
+  BookOpen
 } from 'lucide-react'
 import BpmnModeler from 'bpmn-js/lib/Modeler'
 import { downloadXML, downloadSVG, generatePDF } from '../lib/export-service'
@@ -36,6 +40,9 @@ export default function ProcessesPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const { setHideSidebar } = useSidebar()
+
+  const [board, setBoard] = useState<Board | null>(null)
+  const [showKnowledgePanel, setShowKnowledgePanel] = useState(false)
 
   const [processes, setProcesses] = useState<Process[]>([])
   const [selectedProcess, setSelectedProcess] = useState<Process | null>(null)
@@ -66,8 +73,15 @@ export default function ProcessesPage() {
   const audioInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
+    const fetchBoardDetails = async (): Promise<void> => {
+      if (!boardId) return
+      const boardData = await getBoard(boardId)
+      setBoard(boardData)
+    }
+
     if (boardId) {
       fetchProcesses()
+      fetchBoardDetails()
     }
   }, [boardId])
 
@@ -305,7 +319,7 @@ export default function ProcessesPage() {
       // or maybe the last few text messages.
       // A simple approach: Pass the current constructed message.
 
-      const bpmnXml = await agentService.generateBPMN([userMsg])
+      const bpmnXml = await agentService.generateBPMN([userMsg], board || undefined)
 
       setXml(bpmnXml)
       setChatMessages((prev) => [
@@ -409,7 +423,14 @@ export default function ProcessesPage() {
               <h1 className="text-3xl font-bold">Processes</h1>
               <p className="text-dark-300 text-sm">Selecione um processo para editar ou crie um novo fluxo.</p>
             </div>
-            <div className="ml-auto">
+            <div className="ml-auto flex gap-3">
+              <button
+                onClick={() => setShowKnowledgePanel(true)}
+                className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-white font-semibold hover:bg-white/10 transition"
+              >
+                <BookOpen size={20} />
+                <span>Base de Conhecimento</span>
+              </button>
               <button
                 onClick={() => setShowCreateModal(true)}
                 className="flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 text-white font-semibold shadow-lg shadow-blue-900/40 hover:opacity-90 transition"
@@ -450,6 +471,14 @@ export default function ProcessesPage() {
           </div>
         </div>
         {renderCreateModal}
+        {board && (
+          <BoardKnowledgePanel
+            board={board}
+            isOpen={showKnowledgePanel}
+            onClose={() => setShowKnowledgePanel(false)}
+            onUpdate={setBoard}
+          />
+        )}
       </>
     )
   }
@@ -533,18 +562,16 @@ export default function ProcessesPage() {
                 className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}
               >
                 <div
-                  className={`w-9 h-9 rounded-2xl flex items-center justify-center flex-shrink-0 border border-white/10 ${
-                    msg.role === 'user' ? 'bg-white/10' : 'bg-gradient-to-br from-emerald-400/10 to-cyan-400/10'
-                  }`}
+                  className={`w-9 h-9 rounded-2xl flex items-center justify-center flex-shrink-0 border border-white/10 ${msg.role === 'user' ? 'bg-white/10' : 'bg-gradient-to-br from-emerald-400/10 to-cyan-400/10'
+                    }`}
                 >
                   {msg.role === 'user' ? <UserIcon size={16} /> : <Bot size={16} />}
                 </div>
                 <div
-                  className={`p-3 rounded-2xl text-sm max-w-[80%] border border-white/10 ${
-                    msg.role === 'user'
-                      ? 'bg-white/5 text-white'
-                      : 'bg-gradient-to-br from-indigo-950/80 to-slate-900/80 text-dark-200'
-                  }`}
+                  className={`p-3 rounded-2xl text-sm max-w-[80%] border border-white/10 ${msg.role === 'user'
+                    ? 'bg-white/5 text-white'
+                    : 'bg-gradient-to-br from-indigo-950/80 to-slate-900/80 text-dark-200'
+                    }`}
                 >
                   {typeof msg.content === 'string' ? (
                     msg.content
@@ -723,7 +750,7 @@ export default function ProcessesPage() {
             xml={xml}
             onModelerInit={setModeler}
             onElementClick={setSelectedElement}
-            onChange={(newXml) => {
+            onChange={() => {
               // Optional: Auto-save logic could go here
             }}
           />
@@ -735,6 +762,14 @@ export default function ProcessesPage() {
         <PropertiesPanel modeler={modeler} element={selectedElement} />
       </div>
       {renderCreateModal}
+      {board && (
+        <BoardKnowledgePanel
+          board={board}
+          isOpen={showKnowledgePanel}
+          onClose={() => setShowKnowledgePanel(false)}
+          onUpdate={setBoard}
+        />
+      )}
     </div>
   )
 }

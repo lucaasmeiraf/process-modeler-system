@@ -40,3 +40,45 @@ EXAMPLE STRUCTURE:
 IMPORTANT: If you cannot generate DI (Diagram Interchange) coordinates easily, you can omit the <bpmndi:BPMNDiagram> section, but be aware that some viewers might not render it automatically without layouting. HOWEVER, for this application, we will assume the frontend handles auto-layout if DI is missing, OR you should try to provide basic DI.
 BETTER STRATEGY: Generate the semantic BPMN part (<bpmn:process>). The frontend modeler might need to perform auto-layout.
 `
+
+import { Board } from '../../types/board'
+
+export const generateSystemPromptWithContext = (board: Board): string => {
+  let contextString = `\n\nCONTEXTO DO SETOR/DEPARTAMENTO (${board.name}):\n`
+  
+  if (board.context_md) {
+    contextString += `\n[VISÃO GERAL]\n${board.context_md}\n`
+  }
+
+  if (board.glossary && board.glossary.length > 0) {
+    contextString += `\n[GLOSSÁRIO DE TERMOS]\n`
+    board.glossary.forEach(g => {
+      contextString += `- ${g.term}: ${g.definition}\n`
+    })
+  }
+
+  if (board.integrated_systems && board.integrated_systems.length > 0) {
+    contextString += `\n[SISTEMAS INTEGRADOS]\n`
+    board.integrated_systems.forEach(s => {
+      contextString += `- ${s.name}: ${s.description}\n`
+    })
+  }
+
+  if (board.legislation && board.legislation.length > 0) {
+    contextString += `\n[LEGISLAÇÃO APLICÁVEL]\n`
+    board.legislation.forEach(l => {
+      contextString += `- ${l.title}: ${l.description}\n`
+    })
+  }
+
+  if (board.org_structure && board.org_structure.length > 0) {
+    contextString += `\n[ESTRUTURA ORGANIZACIONAL]\n`
+    board.org_structure.forEach(o => {
+      contextString += `- ${o.role} (${o.name}): ${o.responsibilities || 'N/A'}\n`
+    })
+  }
+
+  contextString += `\nINSTRUÇÃO ADICIONAL: Utilize o contexto acima para enriquecer o processo. Se o usuário mencionar um termo do glossário ou um sistema, use as informações fornecidas para detalhar as tarefas (ex: "Lançar dados no sistema X").`
+
+  return BPMN_SYSTEM_PROMPT + contextString
+}
